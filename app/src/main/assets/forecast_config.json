@@ -1,0 +1,17 @@
+{
+  "dow_factor": {
+    "0": 1.1016,
+    "1": 0.7224,
+    "2": 0.7825,
+    "3": 0.8434,
+    "4": 0.9369,
+    "5": 1.2396,
+    "6": 1.3745
+  },
+  "period_factor": {
+    "early": 1.3192,
+    "mid": 0.9824,
+    "late": 0.7513
+  },
+  "note": "dow index 0=Sunday .. 6=Saturday, matching Calendar.DAY_OF_WEEK-1 convention"
+}
