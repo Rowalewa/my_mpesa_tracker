@@ -5,7 +5,10 @@
 Every M-Pesa transaction already lands as an SMS. Pesalyzer reads those messages the moment they arrive, turns them into structured records, and builds a full financial picture around them — budgets, net worth, forecasts, and the occasional catch when something doesn't add up. All of it stays on the device.
 
 ## Screenshots
-<p float="left"> <img src="screenshots/pesalyzer-dashboard-1.png" width="200" /> <img src="screenshots/pesalyzer-dashboard-2.png" width="200" /> <img src="screenshots/pesalyzer-dashboard-3.png" width="200" /> </p>
+<p float="left"> 
+  <img src="screenshots/pesalyzer-dashboard-1.png" width="300" /> 
+  <img src="screenshots/pesalyzer-dashboard-2.png" width="300" /> 
+  <img src="screenshots/pesalyzer-dashboard-3.png" width="300" /> </p>
 ## What It Does
 
 ### 📥 Capture, automatically
