@@ -8,7 +8,16 @@ Every M-Pesa transaction already lands as an SMS. Pesalyzer reads those messages
 <p float="left"> 
   <img src="screenshots/pesalyzer-dashboard-1.png" width="300" /> 
   <img src="screenshots/pesalyzer-dashboard-2.png" width="300" /> 
-  <img src="screenshots/pesalyzer-dashboard-3.png" width="300" /> </p>
+  <img src="screenshots/pesalyzer-dashboard-3.png" width="300" /> 
+</p>
+<p float="left"> 
+  <img src="screenshots/pesalyzer-dashboard-4.png" width="450" /> 
+  <img src="screenshots/pesalyzer-dashboard-5.png" width="450" /> 
+</p>
+<p float="left"> 
+  <img src="screenshots/pesalyzer-report-1.png" width="450" /> 
+  <img src="screenshots/pesalyzer-report-2.png" width="450" /> 
+</p>
 ## What It Does
 
 ### 📥 Capture, automatically
