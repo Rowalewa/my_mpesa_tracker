@@ -15,10 +15,10 @@ object MpesaSmsParser {
     // Regex patterns
     private val CODE_REGEX = Regex("""^([A-Z0-9]{10})\s+Confirmed""", RegexOption.IGNORE_CASE)
     private val AMOUNT_REGEX = Regex("""Ksh([\d,]+\.?\d*)""", RegexOption.IGNORE_CASE)
-    private val COST_REGEX = Regex("""Transaction Cost,\s* Ksh([\d,]+\.?\d*)""", RegexOption.IGNORE_CASE)
+    private val COST_REGEX = Regex("""Transaction Cost[,\s]*Ksh\.?([\d,]+\.?\d*)""", RegexOption.IGNORE_CASE)
     // Updated Regex to handle double spaces, hidden newlines, and all three prefix variations
     // Replace BALANCE_REGEX with a more tolerant version:
-    private val BALANCE_REGEX = Regex("""New\s+(?:M-PESA\s+)?(?:account\s+)?balance is Ksh([\d,]+\.?\d*)""", RegexOption.IGNORE_CASE)
+    private val BALANCE_REGEX = Regex("""(?:New\s+(?:M-PESA\s+)?(?:account\s+)?balance\s+is|M-PESA\s+balance\s+is)\s*Ksh\.?([\d,]+\.?\d*)""", RegexOption.IGNORE_CASE)
     private val DATE_REGEX = Regex("""on (\d{1,2}/\d{1,2}/\d{2,4})(?:\s+at)?\s+(\d{1,2}:\d{2}\s?[AP]M)""", RegexOption.IGNORE_CASE)
 
     // Type detection patterns
@@ -63,6 +63,9 @@ object MpesaSmsParser {
 
         // Add near the top of parse(), right after the sender/Confirmed checks:
         if (body.contains("account balance was", ignoreCase = true)) return null
+
+        // Filter to intercept and drop M-Shwari balance inquiries
+        if (body.contains("M-Shwari Deposit Account Balance", ignoreCase = true)) return null
 
         val code = CODE_REGEX.find(body)?.groupValues?.get(1) ?: return null
 
@@ -124,14 +127,28 @@ object MpesaSmsParser {
         }
     }
 
+    private val M_SHWARI_DEPOSIT_PATTERN = Regex("""transferred\s+to\s+M-Shwari""", RegexOption.IGNORE_CASE)
+    private val M_SHWARI_WITHDRAWAL_PATTERN = Regex("""transferred\s+from\s+M-Shwari""", RegexOption.IGNORE_CASE)
+    private fun detectMshwariDirection(text: String, currentBalance: Double, previousBalance: Double?): Boolean {
+        return when {
+            M_SHWARI_DEPOSIT_PATTERN.containsMatchIn(text) -> true     // money leaving M-PESA into M-Shwari
+            M_SHWARI_WITHDRAWAL_PATTERN.containsMatchIn(text) -> false // money coming back from M-Shwari
+            // Neither wording matched — something new. Fall back rather than
+            // guess wrong silently; worth a log line so it surfaces if it
+            // ever actually fires.
+            else -> previousBalance?.let { currentBalance < it } ?: true
+        }
+    }
+
     private fun detectType(body: String, currentBalance: Double, previousBalance: Double?): Triple<TransactionType, String, Boolean> {
 
         val balanceWentDown = if (previousBalance != null) currentBalance < previousBalance else true
 
         // 1. UPDATED ANCHOR: Uses the robust regex to find exactly where the balance text starts,
         // accounting for all Safaricom variations and weird spacing.
+        // 1. UPDATED ANCHOR: Uses the robust regex to find exactly where the balance text starts
         val balanceAnchor = Regex(
-            """(?:New\s+M-PESA\s+(?:account\s+)?balance\s+is|New\s+balance\s+is|M-PESA\s+Account\s*:)""",
+            """(?:New\s+M-PESA\s+(?:account\s+)?balance\s+is|New\s+balance\s+is|M-Shwari\s+balance\s+is|M-PESA\s+balance\s+is|M-PESA\s+Account\s*:)""",
             RegexOption.IGNORE_CASE
         ).find(body)
 
@@ -178,7 +195,7 @@ object MpesaSmsParser {
         }
 
         if (transactionCore.contains("M-SHWARI", ignoreCase = true)) {
-            val isDebit = previousBalance?.let { currentBalance < it } ?: true
+            val isDebit = detectMshwariDirection(transactionCore, currentBalance, previousBalance)  //?.let { currentBalance < it } ?: true
             return Triple(TransactionType.M_SHWARI, "M-Shwari Wallet", isDebit)
         }
 
