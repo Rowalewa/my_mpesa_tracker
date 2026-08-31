@@ -2,6 +2,7 @@ package com.example.my_mpesa_tracker.ui.dashboard
 
 import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -11,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -226,29 +228,117 @@ fun BudgetAlertRow(alert: BudgetAlert) {
     }
 }
 
-// ── Budget Settings Screen ─────────────────────────────────────────────
+// ── Settings: hub + subdialogs ──────────────────────────────────────────
+// Instead of one long scrolling AlertDialog with everything crammed in,
+// this is a short menu (the "hub"). Each row opens its own focused dialog.
+// Cancel / outside-tap on a subdialog returns to the hub; dismissing the
+// hub itself closes Settings entirely.
+
+private enum class SettingsSection { SECURITY, MONTHLY_BUDGET, CATEGORY_BUDGETS }
 
 @Composable
-fun BudgetSettingsDialog(transactions: List<MpesaTransaction>, onDismiss: () -> Unit) {
+fun BudgetSettingsDialog(
+    transactions: List<MpesaTransaction>,
+    onDismiss: () -> Unit,
+    onBudgetsChanged: () -> Unit = {}
+) {
+    var openSection by remember { mutableStateOf<SettingsSection?>(null) }
+
+    when (openSection) {
+        SettingsSection.SECURITY -> {
+            SecuritySettingsDialog(onDismiss = { openSection = null })
+        }
+        SettingsSection.MONTHLY_BUDGET -> {
+            MonthlyBudgetDialog(
+                onDismiss = { openSection = null },
+                onSaved = { openSection = null; onBudgetsChanged() }
+            )
+        }
+        SettingsSection.CATEGORY_BUDGETS -> {
+            CategoryBudgetsDialog(
+                transactions = transactions,
+                onDismiss = { openSection = null },
+                onSaved = { openSection = null; onBudgetsChanged() }
+            )
+        }
+        null -> {
+            SettingsHubDialog(onDismiss = onDismiss, onOpenSection = { openSection = it })
+        }
+    }
+}
+
+@Composable
+private fun SettingsHubDialog(onDismiss: () -> Unit, onOpenSection: (SettingsSection) -> Unit) {
     val context = LocalContext.current
-    var monthlyBudget by remember {
-        mutableStateOf(
-            BudgetManager.getMonthlyBudget(context).let { if (it > 0) it.toLong().toString() else "" }
-        )
-    }
 
-    var fixedValues by remember {
-        mutableStateOf(
-            BUDGETABLE_SUBCATEGORIES.associateWith { sub ->
-                BudgetManager.getFixedCategoryBudget(context, sub).let { if (it > 0) it.toLong().toString() else "" }
+    // Read-only snapshot for the subtitle text — each subdialog reads/writes
+    // the real state itself, so this just needs to look right when the hub
+    // (re)opens, not stay live while a subdialog is on screen.
+    val isLockEnabled = remember { AppLockManager.isLockEnabled(context) }
+    val monthlyBudget = remember { BudgetManager.getMonthlyBudget(context) }
+    val configuredCount = remember {
+        BUDGETABLE_SUBCATEGORIES.count { sub ->
+            when (BudgetManager.getCategoryBudgetMode(context, sub)) {
+                BudgetMode.FIXED -> BudgetManager.getFixedCategoryBudget(context, sub) > 0
+                BudgetMode.ADAPTIVE -> true
             }
-        )
-    }
-    var modes by remember {
-        mutableStateOf(BUDGETABLE_SUBCATEGORIES.associateWith { BudgetManager.getCategoryBudgetMode(context, it) })
+        }
     }
 
-//    var showCategoryDialog by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = CardDark,
+        title = { Text("Settings", color = Color.White, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                SettingsMenuRow(
+                    title = "Security",
+                    subtitle = if (isLockEnabled) "App lock enabled" else "App lock disabled",
+                    onClick = { onOpenSection(SettingsSection.SECURITY) }
+                )
+                SettingsMenuRow(
+                    title = "Monthly Total",
+                    subtitle = if (monthlyBudget > 0) formatKsh(monthlyBudget) else "Not set",
+                    onClick = { onOpenSection(SettingsSection.MONTHLY_BUDGET) }
+                )
+                SettingsMenuRow(
+                    title = "Per Category",
+                    subtitle = "$configuredCount of ${BUDGETABLE_SUBCATEGORIES.size} configured",
+                    onClick = { onOpenSection(SettingsSection.CATEGORY_BUDGETS) }
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Done", color = MpesaGreen) }
+        }
+    )
+}
+
+@Composable
+private fun SettingsMenuRow(title: String, subtitle: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .background(Color.White.copy(alpha = 0.03f))
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            Text(title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Text(subtitle, color = TextSecondary, fontSize = 11.sp)
+        }
+        Text("›", color = TextSecondary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+// ── Security subdialog ──────────────────────────────────────────────────
+
+@Composable
+private fun SecuritySettingsDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
     var showPinSetup by remember { mutableStateOf(false) }
     var isLockEnabled by remember { mutableStateOf(AppLockManager.isLockEnabled(context)) }
     var isBiometricEnabled by remember { mutableStateOf(AppLockManager.isBiometricEnabled(context)) }
@@ -264,99 +354,96 @@ fun BudgetSettingsDialog(transactions: List<MpesaTransaction>, onDismiss: () -> 
         )
     }
 
-    // Secondary sub-dialog overlay for individual category configuration
-//    if (showCategoryDialog) {
-//        CategoryBudgetsSubDialog(
-//            initialBudgets = categoryBudgets,
-//            onDismiss = { showCategoryDialog = false },
-//            onSave = { updatedBudgets ->
-//                categoryBudgets = updatedBudgets
-//                showCategoryDialog = false
-//            }
-//        )
-//    }
-
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = CardDark,
-        title = { Text("Settings", color = Color.White, fontWeight = FontWeight.Bold) },
+        title = { Text("Security", color = Color.White, fontWeight = FontWeight.Bold) },
         text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier
-                    .heightIn(max = 480.dp)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                // ── Perfectly Intact Security Section ────────────────────────
-                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            if (isLockEnabled) "App Lock Enabled" else "App Lock Disabled",
+                            color = Color.White,
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            if (isLockEnabled) "Requires authorization on launch" else "Anyone can open the app",
+                            color = TextSecondary,
+                            fontSize = 11.sp
+                        )
+                    }
 
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Security Preferences", color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    if (isLockEnabled) {
+                        TextButton(onClick = {
+                            AppLockManager.disableLock(context)
+                            isLockEnabled = false
+                            isBiometricEnabled = false
+                        }) {
+                            Text("Disable", color = Color(0xFFFF6B6B), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        TextButton(onClick = { showPinSetup = true }) {
+                            Text("Set PIN", color = MpesaGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
 
+                if (isLockEnabled && AppLockManager.isBiometricAvailable(context)) {
                     Row(
                         Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text(
-                                if (isLockEnabled) "App Lock Enabled" else "App Lock Disabled",
-                                color = Color.White,
-                                fontSize = 14.sp
-                            )
-                            Text(
-                                if (isLockEnabled) "Requires authorization on launch" else "Anyone can open the app",
-                                color = TextSecondary,
-                                fontSize = 11.sp
-                            )
+                            Text("Use Fingerprint", color = Color.White, fontSize = 14.sp)
+                            Text("Use biometric hardware signature", color = TextSecondary, fontSize = 11.sp)
                         }
-
-                        if (isLockEnabled) {
-                            TextButton(onClick = {
-                                AppLockManager.disableLock(context)
-                                isLockEnabled = false
-                                isBiometricEnabled = false
-                            }) {
-                                Text("Disable", color = Color(0xFFFF6B6B), fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            }
-                        } else {
-                            TextButton(onClick = { showPinSetup = true }) {
-                                Text("Set PIN", color = MpesaGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-
-                    if (isLockEnabled && AppLockManager.isBiometricAvailable(context)) {
-                        Row(
-                            Modifier.fillMaxWidth()
-                                .padding(top = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text("Use Fingerprint", color = Color.White, fontSize = 14.sp)
-                                Text("Use biometric hardware signature", color = TextSecondary, fontSize = 11.sp)
-                            }
-                            Switch(
-                                checked = isBiometricEnabled,
-                                onCheckedChange = { checked ->
-                                    isBiometricEnabled = checked
-                                    AppLockManager.enableBiometric(context, checked)
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = MpesaGreen,
-                                    checkedTrackColor = MpesaGreen.copy(0.3f),
-                                    uncheckedThumbColor = Color.Gray,
-                                    uncheckedTrackColor = Color.White.copy(0.1f)
-                                )
+                        Switch(
+                            checked = isBiometricEnabled,
+                            onCheckedChange = { checked ->
+                                isBiometricEnabled = checked
+                                AppLockManager.enableBiometric(context, checked)
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = MpesaGreen,
+                                checkedTrackColor = MpesaGreen.copy(0.3f),
+                                uncheckedThumbColor = Color.Gray,
+                                uncheckedTrackColor = Color.White.copy(0.1f)
                             )
-                        }
+                        )
                     }
                 }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Done", color = MpesaGreen) }
+        }
+    )
+}
 
-                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+// ── Monthly total subdialog ─────────────────────────────────────────────
 
-                Text("Monthly Total", color = TextSecondary, fontSize = 12.sp)
+@Composable
+private fun MonthlyBudgetDialog(onDismiss: () -> Unit, onSaved: () -> Unit) {
+    val context = LocalContext.current
+    var monthlyBudget by remember {
+        mutableStateOf(
+            BudgetManager.getMonthlyBudget(context).let { if (it > 0) it.toLong().toString() else "" }
+        )
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = CardDark,
+        title = { Text("Monthly Total", color = Color.White, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Overall spending cap for the month", color = TextSecondary, fontSize = 12.sp)
                 OutlinedTextField(
                     value = monthlyBudget,
                     onValueChange = { monthlyBudget = it },
@@ -373,27 +460,51 @@ fun BudgetSettingsDialog(transactions: List<MpesaTransaction>, onDismiss: () -> 
                         cursorColor = MpesaGreen
                     )
                 )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                monthlyBudget.toDoubleOrNull()?.let { BudgetManager.setMonthlyBudget(context, it) }
+                onSaved()
+            }) { Text("Save", color = MpesaGreen) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel", color = TextSecondary) }
+        }
+    )
+}
 
-//                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+// ── Per-category subdialog ──────────────────────────────────────────────
 
-//                // 2. Noise-Free Category Limits Entry Button
-//                Row(
-//                    modifier = Modifier.fillMaxWidth(),
-//                    horizontalArrangement = Arrangement.SpaceBetween,
-//                    verticalAlignment = Alignment.CenterVertically
-//                ) {
-//                    Column(modifier = Modifier.weight(1f)) {
-//                        Text("Category Limits", color = Color.White, fontSize = 14.sp)
-//                        Text("Set budgets for specific transaction types", color = TextSecondary, fontSize = 11.sp)
-//                    }
-//                    TextButton(onClick = { showCategoryDialog = true }) {
-//                        Text("Configure", color = MpesaGreen, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-//                    }
-//                }
+@Composable
+private fun CategoryBudgetsDialog(
+    transactions: List<MpesaTransaction>,
+    onDismiss: () -> Unit,
+    onSaved: () -> Unit
+) {
+    val context = LocalContext.current
+    var fixedValues by remember {
+        mutableStateOf(
+            BUDGETABLE_SUBCATEGORIES.associateWith { sub ->
+                BudgetManager.getFixedCategoryBudget(context, sub).let { if (it > 0) it.toLong().toString() else "" }
+            }
+        )
+    }
+    var modes by remember {
+        mutableStateOf(BUDGETABLE_SUBCATEGORIES.associateWith { BudgetManager.getCategoryBudgetMode(context, it) })
+    }
 
-                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
-                Text("Per Category", color = TextSecondary, fontSize = 12.sp)
-
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = CardDark,
+        title = { Text("Per Category", color = Color.White, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier
+                    .heightIn(max = 480.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
                 BUDGETABLE_SUBCATEGORIES.forEach { sub ->
                     val mode = modes[sub] ?: BudgetMode.FIXED
                     val isAdaptive = mode == BudgetMode.ADAPTIVE
@@ -480,12 +591,11 @@ fun BudgetSettingsDialog(transactions: List<MpesaTransaction>, onDismiss: () -> 
         },
         confirmButton = {
             TextButton(onClick = {
-                monthlyBudget.toDoubleOrNull()?.let { BudgetManager.setMonthlyBudget(context, it) }
                 fixedValues.forEach { (sub, value) ->
                     val parsed = value.toDoubleOrNull() ?: 0.0
                     BudgetManager.setFixedCategoryBudget(context, sub, parsed)
                 }
-                onDismiss()
+                onSaved()
             }) { Text("Save", color = MpesaGreen) }
         },
         dismissButton = {
