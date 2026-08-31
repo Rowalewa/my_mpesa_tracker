@@ -713,7 +713,7 @@ fun Header(transactions: List<MpesaTransaction>) {
                     .background(MpesaGreen, RoundedCornerShape(20.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Text("M", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("P", color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
     }

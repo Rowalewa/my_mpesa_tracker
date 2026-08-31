@@ -248,10 +248,38 @@ fun BudgetSettingsDialog(transactions: List<MpesaTransaction>, onDismiss: () -> 
         mutableStateOf(BUDGETABLE_SUBCATEGORIES.associateWith { BudgetManager.getCategoryBudgetMode(context, it) })
     }
 
+//    var showCategoryDialog by remember { mutableStateOf(false) }
+    var showPinSetup by remember { mutableStateOf(false) }
+    var isLockEnabled by remember { mutableStateOf(AppLockManager.isLockEnabled(context)) }
+    var isBiometricEnabled by remember { mutableStateOf(AppLockManager.isBiometricEnabled(context)) }
+
+    if (showPinSetup) {
+        PinSetupDialog(
+            onDismiss = { showPinSetup = false },
+            onPinSet = { pin ->
+                AppLockManager.setPin(context, pin)
+                isLockEnabled = true
+                showPinSetup = false
+            }
+        )
+    }
+
+    // Secondary sub-dialog overlay for individual category configuration
+//    if (showCategoryDialog) {
+//        CategoryBudgetsSubDialog(
+//            initialBudgets = categoryBudgets,
+//            onDismiss = { showCategoryDialog = false },
+//            onSave = { updatedBudgets ->
+//                categoryBudgets = updatedBudgets
+//                showCategoryDialog = false
+//            }
+//        )
+//    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = CardDark,
-        title = { Text("Budget Settings", color = Color.White, fontWeight = FontWeight.Bold) },
+        title = { Text("Settings", color = Color.White, fontWeight = FontWeight.Bold) },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -259,6 +287,75 @@ fun BudgetSettingsDialog(transactions: List<MpesaTransaction>, onDismiss: () -> 
                     .heightIn(max = 480.dp)
                     .verticalScroll(rememberScrollState())
             ) {
+                // ── Perfectly Intact Security Section ────────────────────────
+                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Security Preferences", color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                if (isLockEnabled) "App Lock Enabled" else "App Lock Disabled",
+                                color = Color.White,
+                                fontSize = 14.sp
+                            )
+                            Text(
+                                if (isLockEnabled) "Requires authorization on launch" else "Anyone can open the app",
+                                color = TextSecondary,
+                                fontSize = 11.sp
+                            )
+                        }
+
+                        if (isLockEnabled) {
+                            TextButton(onClick = {
+                                AppLockManager.disableLock(context)
+                                isLockEnabled = false
+                                isBiometricEnabled = false
+                            }) {
+                                Text("Disable", color = Color(0xFFFF6B6B), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            }
+                        } else {
+                            TextButton(onClick = { showPinSetup = true }) {
+                                Text("Set PIN", color = MpesaGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
+                    if (isLockEnabled && AppLockManager.isBiometricAvailable(context)) {
+                        Row(
+                            Modifier.fillMaxWidth()
+                                .padding(top = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text("Use Fingerprint", color = Color.White, fontSize = 14.sp)
+                                Text("Use biometric hardware signature", color = TextSecondary, fontSize = 11.sp)
+                            }
+                            Switch(
+                                checked = isBiometricEnabled,
+                                onCheckedChange = { checked ->
+                                    isBiometricEnabled = checked
+                                    AppLockManager.enableBiometric(context, checked)
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = MpesaGreen,
+                                    checkedTrackColor = MpesaGreen.copy(0.3f),
+                                    uncheckedThumbColor = Color.Gray,
+                                    uncheckedTrackColor = Color.White.copy(0.1f)
+                                )
+                            )
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+
                 Text("Monthly Total", color = TextSecondary, fontSize = 12.sp)
                 OutlinedTextField(
                     value = monthlyBudget,
@@ -276,6 +373,23 @@ fun BudgetSettingsDialog(transactions: List<MpesaTransaction>, onDismiss: () -> 
                         cursorColor = MpesaGreen
                     )
                 )
+
+//                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+
+//                // 2. Noise-Free Category Limits Entry Button
+//                Row(
+//                    modifier = Modifier.fillMaxWidth(),
+//                    horizontalArrangement = Arrangement.SpaceBetween,
+//                    verticalAlignment = Alignment.CenterVertically
+//                ) {
+//                    Column(modifier = Modifier.weight(1f)) {
+//                        Text("Category Limits", color = Color.White, fontSize = 14.sp)
+//                        Text("Set budgets for specific transaction types", color = TextSecondary, fontSize = 11.sp)
+//                    }
+//                    TextButton(onClick = { showCategoryDialog = true }) {
+//                        Text("Configure", color = MpesaGreen, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+//                    }
+//                }
 
                 HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
                 Text("Per Category", color = TextSecondary, fontSize = 12.sp)
