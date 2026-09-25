@@ -3,6 +3,7 @@ package com.example.my_mpesa_tracker.ui.dashboard
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -323,7 +325,7 @@ fun ReportScreen(vm: DashboardViewModel) {
             }
 
             if (exportMessage.isNotBlank()) {
-                Text(exportMessage, color = Color(0xFFFF6B6B), fontSize = 12.sp)
+                Text(exportMessage, color = NegativeRed, fontSize = 12.sp)
             }
         }
 
@@ -344,10 +346,57 @@ fun ReportScreen(vm: DashboardViewModel) {
             }
         }
 
-        // Summary Card
+        // Hero: the one number that matters, big — same visual language as Home
+        item { NetFlowCard(state.stats) }
+
+        // Summary sentence
         item {
             ReportCard(title = "Summary") {
                 Text(report.summary, color = TextSecondary, fontSize = 14.sp, lineHeight = 22.sp)
+            }
+        }
+
+        // Alerts — urgent, so they come right after the summary
+        if (report.alerts.isNotEmpty()) {
+            item {
+                ReportCard(title = "Alerts") {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        report.alerts.forEach { alert ->
+                            ReportIconRow(
+                                icon = "⚠️",
+                                text = alert.removePrefix("⚠️ "),
+                                badgeColor = NegativeRed
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Highlights — the interesting facts, each its own icon-badged row
+        if (report.highlights.isNotEmpty()) {
+            item {
+                ReportCard(title = "Highlights") {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        report.highlights.forEach { highlight ->
+                            val (icon, text) = splitLeadingIcon(highlight)
+                            ReportIconRow(icon = icon, text = text, badgeColor = MpesaGreen)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Patterns — the analysis, one row per observation instead of a bullet paragraph
+        if (report.patterns.isNotEmpty()) {
+            item {
+                ReportCard(title = "Spending Patterns") {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        report.patterns.forEach { pattern ->
+                            ReportIconRow(icon = "💡", text = pattern, badgeColor = TextSecondary)
+                        }
+                    }
+                }
             }
         }
 
@@ -449,66 +498,27 @@ fun ReportScreen(vm: DashboardViewModel) {
             }
         }
 
-        // Alerts Card
-        if (report.alerts.isNotEmpty()) {
-            item {
-                ReportCard(title = "Alerts") {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        report.alerts.forEach { alert ->
-                            Text(alert, color = Color(0xFFFFB3B3), fontSize = 13.sp, lineHeight = 20.sp)
-                        }
-                    }
-                }
-            }
-        }
-
-        // Spending Patterns Card
-        if (report.patterns.isNotEmpty()) {
-            item {
-                ReportCard(title = "Spending Patterns") {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        report.patterns.forEach { pattern ->
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("•", color = MpesaGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                Text(pattern, color = TextSecondary, fontSize = 13.sp, lineHeight = 20.sp, modifier = Modifier.weight(1f))
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Highlights Card
-        if (report.highlights.isNotEmpty()) {
-            item {
-                ReportCard(title = "Highlights") {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        report.highlights.forEach { highlight ->
-                            Text(highlight, color = Color.White, fontSize = 13.sp, lineHeight = 20.sp)
-                        }
-                    }
-                }
-            }
-        }
-
-        // Statistics Card
+        // Full statistics appendix — tile grid instead of a flat label/value list.
+        // Net Flow isn't repeated here since the hero card at the top already shows it.
         item {
             ReportCard(title = "Statistics") {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StatRow("Total Spent", formatKsh(state.stats.totalSpent), Color(0xFFFF6B6B))
-                    StatRow("Total Received", formatKsh(state.stats.totalReceived), Color(0xFF4CAF50))
-                    StatRow("Net Flow", formatKsh(state.stats.netFlow),
-                        if (state.stats.netFlow >= 0) Color(0xFF4CAF50) else Color(0xFFFF6B6B))
-                    HorizontalDivider(
-                        Modifier,
-                        DividerDefaults.Thickness,
-                        color = Color.White.copy(alpha = 0.08f)
-                    )
-                    StatRow("Max Transaction", formatKsh(state.stats.maxTransaction), Color.White)
-                    StatRow("Min Transaction", formatKsh(state.stats.minTransaction), Color.White)
-                    StatRow("Average", formatKsh(state.stats.avgTransaction), Color.White)
-                    StatRow("Total Transactions", "${state.stats.transactionCount}", Color.White)
-                    StatRow("Transaction Costs", formatKsh(totalCosts), Color(0xFFFF6B6B))
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        ReportStatTile("Total Spent", formatKsh(state.stats.totalSpent), NegativeRed, Modifier.weight(1f))
+                        ReportStatTile("Total Received", formatKsh(state.stats.totalReceived), PositiveGreen, Modifier.weight(1f))
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        ReportStatTile("Max Transaction", formatKsh(state.stats.maxTransaction), Color.White, Modifier.weight(1f))
+                        ReportStatTile("Min Transaction", formatKsh(state.stats.minTransaction), Color.White, Modifier.weight(1f))
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        ReportStatTile("Average", formatKsh(state.stats.avgTransaction), Color.White, Modifier.weight(1f))
+                        ReportStatTile("Transactions", "${state.stats.transactionCount}", Color.White, Modifier.weight(1f))
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        ReportStatTile("Transaction Costs", formatKsh(totalCosts), NegativeRed, Modifier.weight(1f))
+                        Spacer(Modifier.weight(1f))
+                    }
                 }
             }
         }
@@ -532,10 +542,43 @@ fun ReportCard(title: String, content: @Composable ColumnScope.() -> Unit) {
     }
 }
 
+/**
+ * One icon-badged row, used for Alerts/Highlights/Patterns so each item reads as a
+ * distinct observation instead of a line in a paragraph. Reuses the same
+ * icon-in-a-tinted-box language TransactionRow already uses elsewhere in the app.
+ */
 @Composable
-fun StatRow(label: String, value: String, valueColor: Color) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, color = TextSecondary, fontSize = 13.sp)
-        Text(value, color = valueColor, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+fun ReportIconRow(icon: String, text: String, badgeColor: Color) {
+    Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .background(badgeColor.copy(alpha = 0.15f), RoundedCornerShape(10.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(icon, fontSize = 15.sp)
+        }
+        Text(
+            text,
+            color = TextSecondary,
+            fontSize = 13.sp,
+            lineHeight = 19.sp,
+            modifier = Modifier.weight(1f).padding(top = 6.dp)
+        )
+    }
+}
+
+/** Splits a "🔤 rest of sentence" string into its leading icon and the remaining text. */
+private fun splitLeadingIcon(text: String, fallback: String = "•"): Pair<String, String> {
+    val parts = text.split(" ", limit = 2)
+    return if (parts.size == 2 && parts[0].length <= 4) parts[0] to parts[1] else fallback to text
+}
+
+@Composable
+fun ReportStatTile(label: String, value: String, valueColor: Color, modifier: Modifier = Modifier) {
+    Column(modifier) {
+        Text(label, color = TextSecondary, fontSize = 11.sp)
+        Spacer(Modifier.height(2.dp))
+        Text(value, color = valueColor, fontWeight = FontWeight.Bold, fontSize = 16.sp)
     }
 }
