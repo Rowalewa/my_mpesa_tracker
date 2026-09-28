@@ -1,5 +1,8 @@
 package com.example.my_mpesa_tracker.ui.onboarding
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -36,12 +39,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -50,7 +55,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.my_mpesa_tracker.data.model.TransactionType
+import com.example.my_mpesa_tracker.ui.dashboard.AuthManager
+import com.example.my_mpesa_tracker.ui.dashboard.BackupManager
+import com.example.my_mpesa_tracker.ui.dashboard.DriveAuthManager
 import com.example.my_mpesa_tracker.util.label
+import com.google.android.gms.auth.api.identity.AuthorizationRequest
+import com.google.android.gms.auth.api.identity.Identity
+import com.google.android.gms.common.api.Scope
+import kotlinx.coroutines.launch
 
 // ── Brand colours ─────────────────────────────────────────────────────────────
 //val OnboardBg        = Color(0xFFF5F9F6)
@@ -96,11 +108,21 @@ val onboardPages = listOf(
 fun OnboardingScreen(onComplete: (monthlyBudget: Double?) -> Unit) {
     var currentPage by remember { mutableIntStateOf(0) }
     var showBudgetSetup by remember { mutableStateOf(false) }
+    var showRestoreSetup by remember { mutableStateOf(false) }
+    var pendingBudget by remember { mutableStateOf<Double?>(null) }
+
+    if (showRestoreSetup) {
+        RestoreSetupScreen(onFinish = { onComplete(pendingBudget) })
+        return
+    }
 
     if (showBudgetSetup) {
         BudgetSetupScreen(
-            onSkip = { onComplete(null) },
-            onConfirm = { budget -> onComplete(budget) }
+            onSkip = { showRestoreSetup = true },
+            onConfirm = { budget ->
+                pendingBudget = budget
+                showRestoreSetup = true
+            }
         )
         return
     }
@@ -444,6 +466,203 @@ fun BudgetSetupScreen(onSkip: () -> Unit, onConfirm: (Double) -> Unit) {
 
             TextButton(onClick = onSkip) {
                 Text("Skip budget setup", color = OnboardSubtext, fontSize = 14.sp)
+            }
+
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+// ── Restore Setup Screen ──────────────────────────────────────────────────────
+// One tap chains sign-in → Drive authorization → restore, since asking a new user
+// to make three separate decisions here would be a worse experience than just
+// trying the whole thing and reporting back what happened.
+
+private const val DRIVE_APPDATA_SCOPE_ONBOARDING = "https://www.googleapis.com/auth/drive.appdata"
+
+@Composable
+fun RestoreSetupScreen(onFinish: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var isWorking by remember { mutableStateOf(false) }
+    var statusMessage by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf("") }
+    var isDone by remember { mutableStateOf(false) }
+    var userEmail by remember { mutableStateOf<String?>(AuthManager.currentUser()?.email) }
+
+    fun runRestore() {
+        scope.launch {
+            val result = BackupManager.restoreNow(context)
+            isWorking = false
+            result.onSuccess { r ->
+                isDone = true
+                statusMessage = when {
+                    !r.found -> "No backup found — starting fresh"
+                    r.added > 0 -> "Restored ${r.added} transaction${if (r.added == 1) "" else "s"} from your backup"
+                    else -> "Already up to date"
+                }
+            }
+            result.onFailure { err -> errorMessage = err.message ?: "Restore failed" }
+        }
+    }
+
+    val authLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()
+    ) { activityResult ->
+        try {
+            Identity.getAuthorizationClient(context).getAuthorizationResultFromIntent(activityResult.data)
+            DriveAuthManager.markAuthorized(context)
+            runRestore()
+        } catch (e: Exception) {
+            isWorking = false
+            errorMessage = e.message ?: "Couldn't enable backup access"
+        }
+    }
+
+    fun requestDriveAccessThenRestore() {
+        val request = AuthorizationRequest.builder()
+            .setRequestedScopes(listOf(Scope(DRIVE_APPDATA_SCOPE_ONBOARDING)))
+            .build()
+        Identity.getAuthorizationClient(context)
+            .authorize(request)
+            .addOnSuccessListener { authResult ->
+                if (authResult.hasResolution()) {
+                    val pendingIntent = authResult.pendingIntent
+                    if (pendingIntent != null) {
+                        authLauncher.launch(IntentSenderRequest.Builder(pendingIntent.intentSender).build())
+                    } else {
+                        isWorking = false
+                        errorMessage = "Couldn't start authorization"
+                    }
+                } else {
+                    DriveAuthManager.markAuthorized(context)
+                    runRestore()
+                }
+            }
+            .addOnFailureListener { e ->
+                isWorking = false
+                errorMessage = e.message ?: "Couldn't enable backup access"
+            }
+    }
+
+    fun startRestoreFlow() {
+        errorMessage = ""
+        statusMessage = ""
+        isWorking = true
+        scope.launch {
+            val result = AuthManager.signInWithGoogle(context)
+            result.onSuccess { user ->
+                userEmail = user.email
+                requestDriveAccessThenRestore()
+            }
+            result.onFailure { err ->
+                isWorking = false
+                errorMessage = err.message ?: "Sign-in failed"
+            }
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(colors = listOf(Color(0xFFE8F5EE), Color(0xFFFFFFFF))))
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(Modifier.height(48.dp))
+
+            Text("☁️", fontSize = 48.sp)
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "Restore your data",
+                color = OnboardText,
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Serif
+            )
+            Text(
+                "Optional — only if you're moving from another phone",
+                color = OnboardSubtext,
+                fontSize = 13.sp,
+                fontStyle = FontStyle.Italic,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(Modifier.height(24.dp))
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = OnboardCard),
+                elevation = CardDefaults.cardElevation(2.dp)
+            ) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    when {
+                        isDone -> {
+                            Text("✓", color = OnboardGreen, fontSize = 24.sp)
+                        }
+                        userEmail != null -> {
+                            Text("Signed in as $userEmail", color = OnboardText, fontSize = 13.sp)
+                        }
+                        else -> {
+                            Text(
+                                "Sign in with the Google account you backed up to, and we'll check for your data automatically.",
+                                color = OnboardSubtext,
+                                fontSize = 14.sp,
+                                lineHeight = 20.sp
+                            )
+                        }
+                    }
+
+                    if (!isDone) {
+                        Button(
+                            onClick = { startRestoreFlow() },
+                            enabled = !isWorking,
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = OnboardGreen)
+                        ) {
+                            Text(
+                                if (isWorking) "Checking..." else "Sign in and check for backup",
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+
+                    if (errorMessage.isNotBlank()) {
+                        Text(errorMessage, color = Color(0xFFCC0000), fontSize = 12.sp)
+                    }
+                    if (statusMessage.isNotBlank()) {
+                        Text(statusMessage, color = OnboardGreen, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+
+            Spacer(Modifier.weight(1f))
+
+            Button(
+                onClick = onFinish,
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = OnboardGreen)
+            ) {
+                Text(
+                    if (isDone) "Start using Pesalyzer" else "Continue",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
+                )
+            }
+
+            if (!isDone) {
+                Spacer(Modifier.height(12.dp))
+                TextButton(onClick = onFinish) {
+                    Text("Skip", color = OnboardSubtext, fontSize = 14.sp)
+                }
             }
 
             Spacer(Modifier.height(24.dp))

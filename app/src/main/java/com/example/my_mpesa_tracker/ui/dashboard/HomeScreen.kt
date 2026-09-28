@@ -99,6 +99,8 @@ fun HomeScreen(vm: DashboardViewModel = viewModel()) {
         TransactionDetailDialog(tx = tx, onDismiss = { showTransactionDetail = null })
     }
 
+    val previousNetFlow = rememberPreviousPeriodNetFlow(state.selectedPeriod)
+
     PullToRefreshBox(
         isRefreshing = isRefreshing,
         onRefresh = {
@@ -137,7 +139,9 @@ fun HomeScreen(vm: DashboardViewModel = viewModel()) {
                 }
             }
 
-            item { NetFlowCard(state.stats) }
+            item { NetFlowCard(state.stats, previousNetFlow) }
+
+            item { MoneyTipCard(stats = state.stats, transactions = state.allTransactions) }
 
             if (state.selectedPeriod == Period.MONTH) {
                 item { ForecastCard(thisMonthTransactions = state.allTransactions.filterByIncludedSims(LocalContext.current)) }
@@ -177,7 +181,7 @@ fun HomeScreen(vm: DashboardViewModel = viewModel()) {
 }
 
 @Composable
-fun NetFlowCard(stats: SpendingStats) {
+fun NetFlowCard(stats: SpendingStats, previousNetFlow: Double? = null) {
     val isPositive = stats.netFlow >= 0
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -188,6 +192,24 @@ fun NetFlowCard(stats: SpendingStats) {
             Text("Net Cash Flow", color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp)
             Spacer(Modifier.height(4.dp))
             Text(formatKsh(stats.netFlow), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 32.sp)
+            if (previousNetFlow != null) {
+                val delta = stats.netFlow - previousNetFlow
+                val improved = delta >= 0
+                Spacer(Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        if (improved) "↑" else "↓",
+                        color = if (improved) PositiveGreenSoft else NegativeRedSoft,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                    Text(
+                        "${formatKsh(kotlin.math.abs(delta))} vs last period",
+                        color = Color.White.copy(alpha = 0.75f),
+                        fontSize = 12.sp
+                    )
+                }
+            }
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 FlowItem("In", stats.totalReceived, PositiveGreenSoft)

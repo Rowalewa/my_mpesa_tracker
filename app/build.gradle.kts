@@ -2,6 +2,7 @@ plugins {
     id("com.google.devtools.ksp") version "2.3.11"
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.google.services)
 }
 
 android {
@@ -69,4 +70,17 @@ dependencies {
 
 // Lifecycle ViewModel
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+
+// Firebase Auth + Google Sign-In (Credential Manager)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
+
+// Drive authorization (separate from sign-in — AuthorizationClient, not Credential Manager)
+    implementation(libs.play.services.auth)
+
+// Scheduling automatic backup
+    implementation(libs.androidx.work.runtime.ktx)
 }

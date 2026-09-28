@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -53,6 +54,7 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun Header(transactions: List<MpesaTransaction>) {
     var showBudgetSettings by remember { mutableStateOf(false) }
+    var showAccount by remember { mutableStateOf(false) }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -60,8 +62,13 @@ fun Header(transactions: List<MpesaTransaction>) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text("Pesalyzer", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 19.sp)
-        IconButton(onClick = { showBudgetSettings = true }) {
-            Icon(Icons.Default.Settings, contentDescription = "Budget", tint = MpesaGreen)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = { showAccount = true }) {
+                Icon(Icons.Default.AccountCircle, contentDescription = "Account", tint = MpesaGreen)
+            }
+            IconButton(onClick = { showBudgetSettings = true }) {
+                Icon(Icons.Default.Settings, contentDescription = "Budget", tint = MpesaGreen)
+            }
         }
     }
 
@@ -70,6 +77,9 @@ fun Header(transactions: List<MpesaTransaction>) {
             transactions = transactions,
             onDismiss = { showBudgetSettings = false }
         )
+    }
+    if (showAccount) {
+        AccountDialog(onDismiss = { showAccount = false })
     }
 }
 

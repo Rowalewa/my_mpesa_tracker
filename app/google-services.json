@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "913844029863",
+    "project_id": "pesalyzer",
+    "storage_bucket": "pesalyzer.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:913844029863:android:f6150c5741f0eed81e0e82",
+        "android_client_info": {
+          "package_name": "com.example.my_mpesa_tracker"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "913844029863-gaa90ord65128j1cq64edciohrtas4rs.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.my_mpesa_tracker",
+            "certificate_hash": "24551fb593bb300ce70960fbb0fd00cb9ac1c7b1"
+          }
+        },
+        {
+          "client_id": "913844029863-js2k7jhbq5b09odlflc70le78isk1r5g.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAq3iQxh49SxO1IPdYW0bOyksJ_ursYFfU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "913844029863-js2k7jhbq5b09odlflc70le78isk1r5g.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

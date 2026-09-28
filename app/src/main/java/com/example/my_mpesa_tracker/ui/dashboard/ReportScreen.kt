@@ -23,6 +23,8 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DividerDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,6 +35,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,6 +48,9 @@ import com.example.my_mpesa_tracker.data.model.MpesaTransaction
 import com.example.my_mpesa_tracker.data.model.TransactionType
 import com.example.my_mpesa_tracker.util.SpendingStats
 import com.example.my_mpesa_tracker.util.label
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -282,6 +288,10 @@ fun ReportScreen(vm: DashboardViewModel) {
     val report = remember(state.filteredTransactions, state.stats, state.dateLabel) {
         ReportEngine.generate(state.stats, state.filteredTransactions, state.dateLabel)
     }
+    val chartData = remember(report, state.filteredTransactions) {
+        ReportCharts.build(report, state.filteredTransactions)
+    }
+    val scope = rememberCoroutineScope()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(SurfaceDark),
@@ -290,6 +300,8 @@ fun ReportScreen(vm: DashboardViewModel) {
     ) {
         item {
             var exportMessage by remember { mutableStateOf("") }
+            var menuOpen by remember { mutableStateOf(false) }
+            var isExporting by remember { mutableStateOf(false) }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -310,16 +322,56 @@ fun ReportScreen(vm: DashboardViewModel) {
                     }) {
                         Icon(Icons.Default.ContentCopy, contentDescription = "Copy report", tint = MpesaGreen)
                     }
-                    // Export as CSV
-                    IconButton(onClick = {
-                        val file = CsvExporter.export(context, state.filteredTransactions, state.dateLabel)
-                        if (file != null) {
-                            CsvExporter.share(context, file)
-                        } else {
-                            exportMessage = "Export failed"
+                    // Share: PDF report or raw CSV
+                    Box {
+                        IconButton(onClick = { menuOpen = true }) {
+                            Icon(Icons.Default.Share, contentDescription = "Share or export", tint = MpesaGreen)
                         }
-                    }) {
-                        Icon(Icons.Default.Share, contentDescription = "Export CSV", tint = MpesaGreen)
+                        DropdownMenu(
+                            expanded = menuOpen,
+                            onDismissRequest = { menuOpen = false },
+                            containerColor = CardDark
+                        ) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(if (isExporting) "Preparing PDF..." else "Share PDF report", color = Color.White)
+                                },
+                                enabled = !isExporting,
+                                onClick = {
+                                    menuOpen = false
+                                    if (state.filteredTransactions.isEmpty()) {
+                                        exportMessage = "Nothing to export for this period"
+                                    } else {
+                                        exportMessage = ""
+                                        isExporting = true
+                                        val stats = state.stats
+                                        scope.launch {
+                                            val file = withContext(Dispatchers.Default) {
+                                                PdfReportExporter.export(context, report, stats, chartData, totalCosts)
+                                            }
+                                            isExporting = false
+                                            if (file != null) {
+                                                PdfReportExporter.share(context, file)
+                                            } else {
+                                                exportMessage = "PDF export failed"
+                                            }
+                                        }
+                                    }
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Export data as CSV", color = Color.White) },
+                                onClick = {
+                                    menuOpen = false
+                                    val file = CsvExporter.export(context, state.filteredTransactions, state.dateLabel)
+                                    if (file != null) {
+                                        CsvExporter.share(context, file)
+                                    } else {
+                                        exportMessage = "Export failed"
+                                    }
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -400,6 +452,18 @@ fun ReportScreen(vm: DashboardViewModel) {
             }
         }
 
+        // Charts — Report-only views (none of these appear on Insights). The same
+        // chart data feeds the PDF export, so screen and PDF always agree.
+        if (chartData.slices.isNotEmpty()) {
+            item { CategoryDonutCard(chartData) }
+        }
+        if (chartData.topRecipients.isNotEmpty()) {
+            item { TopRecipientsCard(chartData) }
+        }
+        if (chartData.weekdaySpend.any { it > 0 }) {
+            item { WeekdaySpendCard(chartData) }
+        }
+
         // Spending Breakdown Table (tableRows)
         item {
             ReportCard(title = "Breakdown by Category") {
@@ -416,7 +480,7 @@ fun ReportScreen(vm: DashboardViewModel) {
                         color = Color.White.copy(alpha = 0.08f)
                     )
                     Spacer(Modifier.height(8.dp))
-                    report.tableRows.forEach { row ->
+                    (report.tableRows + listOfNotNull(chartData.feeRow)).forEach { row ->
                         Row(
                             Modifier.fillMaxWidth().padding(vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically

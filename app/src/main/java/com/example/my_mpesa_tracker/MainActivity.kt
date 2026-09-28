@@ -35,6 +35,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.my_mpesa_tracker.ui.dashboard.AppLockManager
 import com.example.my_mpesa_tracker.ui.dashboard.AppLockScreen
+import com.example.my_mpesa_tracker.ui.dashboard.AutoBackupScheduler
 import com.example.my_mpesa_tracker.ui.dashboard.CardDark
 import com.example.my_mpesa_tracker.ui.dashboard.CustomDateRangeDialog
 import com.example.my_mpesa_tracker.ui.dashboard.DashboardViewModel
@@ -116,6 +117,9 @@ class MainActivity : FragmentActivity() {
             vm.repairCorruptedEntries()
             vm.resyncForSimTagging()
             vm.syncMpesaSms(force = false)
+            // Re-affirms the periodic job on every launch; a no-op if already scheduled
+            // or if backup was never enabled.
+            AutoBackupScheduler.scheduleIfEnabled(applicationContext)
         }
 
         if (showDatePicker) {
