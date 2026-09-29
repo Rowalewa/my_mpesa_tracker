@@ -1,5 +1,5 @@
 plugins {
-    id("com.google.devtools.ksp") version "2.3.11"
+    id("com.google.devtools.ksp") version "2.3.12"
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.services)

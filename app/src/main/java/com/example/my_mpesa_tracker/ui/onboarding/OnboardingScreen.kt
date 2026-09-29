@@ -70,7 +70,7 @@ val OnboardGreen     = Color(0xFF00A550)
 //val OnboardGreenDark = Color(0xFF007A3C)
 val OnboardText      = Color(0xFF1A2E24)
 val OnboardSubtext   = Color(0xFF5A7A68)
-val OnboardCard      = Color(0xFFFFFFFF)
+val OnboardCard      = Color(0xFF8E7618)
 
 // ── Onboarding pages ──────────────────────────────────────────────────────────
 
@@ -488,7 +488,7 @@ fun RestoreSetupScreen(onFinish: () -> Unit) {
     var statusMessage by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
     var isDone by remember { mutableStateOf(false) }
-    var userEmail by remember { mutableStateOf<String?>(AuthManager.currentUser()?.email) }
+    var userEmail by remember { mutableStateOf(AuthManager.currentUser()?.email) }
 
     fun runRestore() {
         scope.launch {

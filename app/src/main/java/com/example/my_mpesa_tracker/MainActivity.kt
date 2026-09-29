@@ -1,7 +1,6 @@
 package com.example.my_mpesa_tracker
 
 import android.Manifest
-import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.compose.setContent
@@ -68,7 +67,7 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
-            val prefs = getSharedPreferences("pesalyzer_prefs", Context.MODE_PRIVATE)
+            val prefs = getSharedPreferences("pesalyzer_prefs", MODE_PRIVATE)
 
             var isUnlocked by remember {
                 mutableStateOf(!AppLockManager.isLockEnabled(this))

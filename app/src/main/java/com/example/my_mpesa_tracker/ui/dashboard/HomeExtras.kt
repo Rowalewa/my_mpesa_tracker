@@ -65,14 +65,14 @@ private fun buildTipPool(stats: SpendingStats, transactions: List<MpesaTransacti
     if (stats.totalReceived > 0) {
         if (stats.netFlow > 0) {
             val keptPct = (stats.netFlow / stats.totalReceived * 100).toInt()
-            tips += "You kept $keptPct% of what came in this period. The 20%-savings guideline puts the bar around there — worth tracking over time."
+            tips += "You kept $keptPct% of what came in this period. The 20%-savings guideline puts the bar around there, worth tracking over time."
         } else if (stats.netFlow < 0) {
-            tips += "You spent more than you received this period. Not always a problem — but worth knowing if it's a one-off or a pattern."
+            tips += "You spent more than you received this period. Not always a problem, but worth knowing if it is a one-off or a pattern."
         }
     }
 
     if (transactions.any { it.type == TransactionType.FULIZA }) {
-        tips += "You used Fuliza this period. Overdraft interest is one of the more expensive forms of short-term credit — worth checking if it's becoming routine rather than an emergency tool."
+        tips += "You used Fuliza this period. Overdraft interest is one of the more expensive forms of short-term credit, worth checking if it is becoming routine rather than an emergency tool."
     }
 
     return tips

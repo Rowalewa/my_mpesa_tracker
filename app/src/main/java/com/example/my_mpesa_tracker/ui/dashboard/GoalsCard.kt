@@ -66,7 +66,7 @@ fun GoalsCard() {
             if (goals.isEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "No goals yet — set one to start tracking progress toward something specific.",
+                    "No goals yet, set one to start tracking progress toward something specific.",
                     color = ChartLabel,
                     fontSize = 12.sp,
                     lineHeight = 18.sp

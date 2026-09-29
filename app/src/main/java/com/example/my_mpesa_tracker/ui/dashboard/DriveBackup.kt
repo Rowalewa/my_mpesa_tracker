@@ -14,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -40,6 +41,7 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import androidx.core.content.edit
 
 // ── Drive appdata authorization. This is a separate consent from Google ──
 // ── Sign-In (that's identity; this is permission to use a Google API) — ──
@@ -56,7 +58,7 @@ object DriveAuthManager {
 
     fun markAuthorized(context: Context) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().putBoolean(KEY_DRIVE_AUTHORIZED, true).apply()
+            .edit { putBoolean(KEY_DRIVE_AUTHORIZED, true) }
         AutoBackupScheduler.scheduleIfEnabled(context)
     }
 }
@@ -83,7 +85,12 @@ object BackupManager {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(KEY_LAST_BACKUP, 0L)
 
     private fun setLastBackupTime(context: Context, time: Long) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putLong(KEY_LAST_BACKUP, time).apply()
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+            putLong(
+                KEY_LAST_BACKUP,
+                time
+            )
+        }
     }
 
     suspend fun backupNow(context: Context): Result<Unit> = withContext(Dispatchers.IO) {
@@ -167,7 +174,7 @@ object BackupManager {
             val obj = array.getJSONObject(i)
             val type = try {
                 TransactionType.valueOf(obj.optString("type", TransactionType.UNKNOWN.name))
-            } catch (e: IllegalArgumentException) {
+            } catch (_: IllegalArgumentException) {
                 TransactionType.UNKNOWN
             }
             result.add(
@@ -202,7 +209,7 @@ object BackupManager {
                 .build()
             val result = Identity.getAuthorizationClient(context).authorize(request).awaitResult()
             if (result.hasResolution()) null else result.accessToken
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
@@ -324,7 +331,7 @@ fun DriveBackupSection() {
     val anyWorking = isEnabling || isBackingUp || isRestoring
     var errorMessage by remember { mutableStateOf("") }
     var statusMessage by remember { mutableStateOf("") }
-    var lastBackupTime by remember { mutableStateOf(BackupManager.getLastBackupTime(context)) }
+    var lastBackupTime by remember { mutableLongStateOf(BackupManager.getLastBackupTime(context)) }
 
     val authLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult()

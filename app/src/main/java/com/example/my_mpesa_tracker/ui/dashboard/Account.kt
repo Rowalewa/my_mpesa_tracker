@@ -51,6 +51,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import androidx.core.content.edit
 
 // ── Local username store — separate from the Google account, since a display ──
 // ── name shouldn't require sign-in. Reuses the app's existing prefs file. ──
@@ -64,7 +65,7 @@ object UserProfileStore {
 
     fun setUsername(context: Context, name: String) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().putString(KEY_USERNAME, name.trim()).apply()
+            .edit { putString(KEY_USERNAME, name.trim()) }
     }
 }
 

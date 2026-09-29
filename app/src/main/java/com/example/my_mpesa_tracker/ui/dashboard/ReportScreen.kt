@@ -142,13 +142,13 @@ object ReportEngine {
         if (stats.maxTransaction > 0 && stats.avgTransaction > 0) {
             val ratio = stats.maxTransaction / stats.avgTransaction
             if (ratio > 3) {
-                patterns.add("Your largest transaction (${formatKsh(stats.maxTransaction)}) is ${ratio.toInt()}x your average — one big payment is skewing your spend profile.")
+                patterns.add("Your largest transaction (${formatKsh(stats.maxTransaction)}) is ${ratio.toInt()}x your average, one big payment is skewing your spend profile.")
             }
         }
 
         if (stats.transactionCount > 0) {
             val avgPerDay = stats.transactionCount.toDouble()
-            if (avgPerDay >= 5) patterns.add("You are transacting frequently — averaging ${stats.transactionCount} movements this period.")
+            if (avgPerDay >= 5) patterns.add("You are transacting frequently, averaging ${stats.transactionCount} movements this period.")
         }
 
         val ziidiRow = tableRows.find { it.category == "Ziidi" }
@@ -171,7 +171,7 @@ object ReportEngine {
         }
 
         if (stats.totalSpent > 0 && stats.totalReceived == 0.0) {
-            alerts.add("⚠️ No income recorded this period — only outflows detected.")
+            alerts.add("⚠️ No income recorded this period, only outflows detected.")
         }
 
         val airtime = tableRows.find { it.category == "Airtime" }

@@ -85,11 +85,13 @@ object ReportCharts {
         val feeRow = if (fees > 0 && total > 0) TableRow("Transaction fees", fees, feeCount, fees / total * 100) else null
 
         val recipients = debits
+            .asSequence()
             .filter { it.counterparty.isNotBlank() }
             .groupBy { it.counterparty.trim() }
             .map { (name, txs) -> name to txs.sumOf { it.amount } }
             .sortedByDescending { it.second }
             .take(MAX_RECIPIENTS)
+            .toList()
 
         val weekday = DoubleArray(7)
         val zone = ZoneId.systemDefault()

@@ -25,18 +25,18 @@ import java.util.Locale
 // Emojis are stripped: PdfDocument's canvas doesn't reliably render colour-emoji
 // fonts, and a row of empty boxes in a financial document looks broken.
 
-private val GREEN = 0xFF00A550.toInt()
-private val GREEN_DARK = 0xFF007A3C.toInt()
-private val GREEN_SOFT = 0xFFA6DBC0.toInt()
-private val RED_DEEP = 0xFF8B0000.toInt()
-private val INK = 0xFF1A1A2E.toInt()
-private val BODY = 0xFF444B5C.toInt()
-private val MUTED = 0xFF8A93A6.toInt()
-private val RULE = 0xFFE3E7EF.toInt()
-private val TILE = 0xFFF3F5F9.toInt()
-private val NEG = 0xFFD64545.toInt()
-private val POS = 0xFF1E8E4E.toInt()
-private val WHITE = 0xFFFFFFFF.toInt()
+private const val GREEN = 0xFF00A550.toInt()
+private const val GREEN_DARK = 0xFF007A3C.toInt()
+private const val GREEN_SOFT = 0xFFA6DBC0.toInt()
+private const val RED_DEEP = 0xFF8B0000.toInt()
+private const val INK = 0xFF1A1A2E.toInt()
+private const val BODY = 0xFF444B5C.toInt()
+private const val MUTED = 0xFF8A93A6.toInt()
+private const val RULE = 0xFFE3E7EF.toInt()
+private const val TILE = 0xFFF3F5F9.toInt()
+private const val NEG = 0xFFD64545.toInt()
+private const val POS = 0xFF1E8E4E.toInt()
+private const val WHITE = 0xFFFFFFFF.toInt()
 
 private const val PAGE_W = 595
 private const val PAGE_H = 842
